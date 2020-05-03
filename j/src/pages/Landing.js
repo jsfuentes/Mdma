@@ -1,152 +1,157 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { createEditor, Transforms, Editor, Text } from "slate";
+import Prism from "prismjs";
+import React, { useState, useCallback, useMemo } from "react";
 import { Slate, Editable, withReact } from "slate-react";
+import { Text, createEditor } from "slate";
+import { withHistory } from "slate-history";
+import { css } from "emotion";
 import { Link } from "react-router-dom";
 
-import { axios } from "utils.js";
-import Navbar from "components/Navbar";
-import Footer from "components/Footer";
-const debug = require("debug")("app:Landing");
+import Navbar from "components/Navbar.js";
+import Footer from "components/Footer.js";
 
-// Define our own custom set of helpers.
-const CustomEditor = {
-  isBoldMarkActive(editor) {
-    const [match] = Editor.nodes(editor, {
-      match: (n) => n.bold === true,
-      universal: true,
-    });
+// eslint-disable-next-line
+Prism.languages.markdown=Prism.languages.extend("markup",{}),Prism.languages.insertBefore("markdown","prolog",{blockquote:{pattern:/^>(?:[\t ]*>)*/m,alias:"punctuation"},code:[{pattern:/^(?: {4}|\t).+/m,alias:"keyword"},{pattern:/``.+?``|`[^`\n]+`/,alias:"keyword"}],title:[{pattern:/\w+.*(?:\r?\n|\r)(?:==+|--+)/,alias:"important",inside:{punctuation:/==+$|--+$/}},{pattern:/(^\s*)#+.+/m,lookbehind:!0,alias:"important",inside:{punctuation:/^#+|#+$/}}],hr:{pattern:/(^\s*)([*-])([\t ]*\2){2,}(?=\s*$)/m,lookbehind:!0,alias:"punctuation"},list:{pattern:/(^\s*)(?:[*+-]|\d+\.)(?=[\t ].)/m,lookbehind:!0,alias:"punctuation"},"url-reference":{pattern:/!?\[[^\]]+\]:[\t ]+(?:\S+|<(?:\\.|[^>\\])+>)(?:[\t ]+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^)\\])*\)))?/,inside:{variable:{pattern:/^(!?\[)[^\]]+/,lookbehind:!0},string:/(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^)\\])*\))$/,punctuation:/^[\[\]!:]|[<>]/},alias:"url"},bold:{pattern:/(^|[^\\])(\*\*|__)(?:(?:\r?\n|\r)(?!\r?\n|\r)|.)+?\2/,lookbehind:!0,inside:{punctuation:/^\*\*|^__|\*\*$|__$/}},italic:{pattern:/(^|[^\\])([*_])(?:(?:\r?\n|\r)(?!\r?\n|\r)|.)+?\2/,lookbehind:!0,inside:{punctuation:/^[*_]|[*_]$/}},url:{pattern:/!?\[[^\]]+\](?:\([^\s)]+(?:[\t ]+"(?:\\.|[^"\\])*")?\)| ?\[[^\]\n]*\])/,inside:{variable:{pattern:/(!?\[)[^\]]+(?=\]$)/,lookbehind:!0},string:{pattern:/"(?:\\.|[^"\\])*"(?=\)$)/}}}}),Prism.languages.markdown.bold.inside.url=Prism.util.clone(Prism.languages.markdown.url),Prism.languages.markdown.italic.inside.url=Prism.util.clone(Prism.languages.markdown.url),Prism.languages.markdown.bold.inside.italic=Prism.util.clone(Prism.languages.markdown.italic),Prism.languages.markdown.italic.inside.bold=Prism.util.clone(Prism.languages.markdown.bold); // prettier-ignore
 
-    return !!match;
-  },
+const MarkdownPreviewExample = () => {
+  const [value, setValue] = useState(initialValue);
+  const renderLeaf = useCallback((props) => <Leaf {...props} />, []);
+  const editor = useMemo(() => withHistory(withReact(createEditor())), []);
 
-  isCodeBlockActive(editor) {
-    const [match] = Editor.nodes(editor, {
-      match: (n) => n.type === "code",
-    });
+  const decorate = useCallback(([node, path]) => {
+    const ranges = [];
 
-    return !!match;
-  },
-
-  toggleBoldMark(editor) {
-    const isActive = CustomEditor.isBoldMarkActive(editor);
-    Transforms.setNodes(
-      editor,
-      { bold: isActive ? null : true },
-      { match: (n) => Text.isText(n), split: true }
-    );
-  },
-
-  toggleCodeBlock(editor) {
-    const isActive = CustomEditor.isCodeBlockActive(editor);
-    Transforms.setNodes(
-      editor,
-      { type: isActive ? null : "code" },
-      { match: (n) => Editor.isBlock(editor, n) }
-    );
-  },
-};
-
-export default function Landing() {
-  const editor = useMemo(() => withReact(createEditor()), []);
-  const [value, setValue] = useState([
-    {
-      type: "paragraph",
-      children: [{ text: "A line of text in a paragraph." }],
-    },
-  ]);
-
-  const renderElement = useCallback((props) => {
-    switch (props.element.type) {
-      case "code":
-        return <CodeElement {...props} />;
-      default:
-        return <DefaultElement {...props} />;
+    if (!Text.isText(node)) {
+      return ranges;
     }
-  }, []);
 
-  const renderLeaf = useCallback((props) => {
-    return <Leaf {...props} />;
+    const getLength = (token) => {
+      if (typeof token === "string") {
+        return token.length;
+      } else if (typeof token.content === "string") {
+        return token.content.length;
+      } else {
+        return token.content.reduce((l, t) => l + getLength(t), 0);
+      }
+    };
+
+    const tokens = Prism.tokenize(node.text, Prism.languages.markdown);
+    let start = 0;
+
+    for (const token of tokens) {
+      const length = getLength(token);
+      const end = start + length;
+
+      if (typeof token !== "string") {
+        ranges.push({
+          [token.type]: true,
+          anchor: { path, offset: start },
+          focus: { path, offset: end },
+        });
+      }
+
+      start = end;
+    }
+
+    return ranges;
   }, []);
 
   return (
     <>
       <Navbar>
-        <Link to="/login" className="navlink">
-          Login
-        </Link>
+        <Link to="/login">Login</Link>
       </Navbar>
-      <Slate
-        editor={editor}
-        value={value}
-        onChange={(value) => setValue(value)}
-      >
-        <div>
-          <button
-            onMouseDown={(event) => {
-              event.preventDefault();
-              CustomEditor.toggleBoldMark(editor);
-            }}
-          >
-            Bold
-          </button>
-          <button
-            onMouseDown={(event) => {
-              event.preventDefault();
-              CustomEditor.toggleCodeBlock(editor);
-            }}
-          >
-            Code Block
-          </button>
-        </div>
-        <Editable
+      <div className="p-8">
+        <Slate
           editor={editor}
-          renderElement={renderElement}
-          renderLeaf={renderLeaf}
-          onKeyDown={(event) => {
-            if (!event.ctrlKey) {
-              return;
-            }
+          value={value}
+          onChange={(value) => setValue(value)}
+        >
+          <Editable
+            decorate={decorate}
+            renderLeaf={renderLeaf}
+            placeholder="Write some markdown..."
+          />
+        </Slate>
+      </div>
 
-            switch (event.key) {
-              case "`": {
-                event.preventDefault();
-                CustomEditor.toggleCodeBlock(editor);
-                break;
-              }
-
-              case "b": {
-                event.preventDefault();
-                CustomEditor.toggleBoldMark(editor);
-                break;
-              }
-            }
-          }}
-        />
-      </Slate>
       <Footer />
     </>
   );
-}
-
-const CodeElement = (props) => {
-  return (
-    <pre {...props.attributes}>
-      <code>{props.children}</code>
-    </pre>
-  );
 };
 
-const DefaultElement = (props) => {
-  return <p {...props.attributes}>{props.children}</p>;
-};
-
-const Leaf = (props) => {
+const Leaf = ({ attributes, children, leaf }) => {
   return (
     <span
-      {...props.attributes}
-      style={{ fontWeight: props.leaf.bold ? "bold" : "normal" }}
+      {...attributes}
+      className={css`
+        font-weight: ${leaf.bold && "bold"};
+        font-style: ${leaf.italic && "italic"};
+        text-decoration: ${leaf.underlined && "underline"};
+        ${
+          leaf.title &&
+          css`
+            display: inline-block;
+            font-weight: bold;
+            font-size: 20px;
+            margin: 20px 0 10px 0;
+          `
+        }
+        ${
+          leaf.list &&
+          css`
+            padding-left: 10px;
+            font-size: 20px;
+            line-height: 10px;
+          `
+        }
+        ${
+          leaf.hr &&
+          css`
+            display: block;
+            text-align: center;
+            border-bottom: 2px solid #ddd;
+          `
+        }
+        ${
+          leaf.blockquote &&
+          css`
+            display: inline-block;
+            border-left: 2px solid #ddd;
+            padding-left: 10px;
+            color: #aaa;
+            font-style: italic;
+          `
+        }
+        ${
+          leaf.code &&
+          css`
+            font-family: monospace;
+            background-color: #eee;
+            padding: 3px;
+          `
+        }
+      `}
     >
-      {props.children}
+      {children}
     </span>
   );
 };
+
+const initialValue = [
+  {
+    children: [
+      {
+        text:
+          "Slate is flexible enough to add **decorations** that can format text based on its content. For example, this editor has **Markdown** preview decorations on it, to make it _dead_ simple to make an editor with built-in Markdown previewing.",
+      },
+    ],
+  },
+  {
+    children: [{ text: "## Try it out!" }],
+  },
+  {
+    children: [{ text: "Try it out for yourself!" }],
+  },
+];
+
+export default MarkdownPreviewExample;

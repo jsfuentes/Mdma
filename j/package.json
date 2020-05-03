@@ -6,8 +6,10 @@
     "@sentry/browser": "^5.15.4",
     "axios": "^0.19.2",
     "debug": "^4.1.1",
+    "emotion": "^10.0.27",
     "lodash": "^4.17.15",
     "moment": "^2.24.0",
+    "prismjs": "^1.20.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-feather": "^2.0.4",
@@ -17,6 +19,7 @@
     "react-scripts": "^3.4.1",
     "react-toastify": "^5.5.0",
     "slate": "^0.57.2",
+    "slate-history": "^0.57.2",
     "slate-react": "^0.57.2"
   },
   "scripts": {
