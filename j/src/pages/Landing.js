@@ -1,13 +1,14 @@
 import Prism from "prismjs";
 import React, { useState, useCallback, useMemo } from "react";
 import { Slate, Editable, withReact } from "slate-react";
-import { Text, createEditor } from "slate";
+import { Text, createEditor, Editor, Transforms } from "slate";
 import { withHistory } from "slate-history";
 import { css } from "emotion";
 import { Link } from "react-router-dom";
 
 import Navbar from "components/Navbar.js";
 import Footer from "components/Footer.js";
+const debug = require("debug")("app:Landing");
 
 // eslint-disable-next-line
 Prism.languages.markdown=Prism.languages.extend("markup",{}),Prism.languages.insertBefore("markdown","prolog",{blockquote:{pattern:/^>(?:[\t ]*>)*/m,alias:"punctuation"},code:[{pattern:/^(?: {4}|\t).+/m,alias:"keyword"},{pattern:/``.+?``|`[^`\n]+`/,alias:"keyword"}],title:[{pattern:/\w+.*(?:\r?\n|\r)(?:==+|--+)/,alias:"important",inside:{punctuation:/==+$|--+$/}},{pattern:/(^\s*)#+.+/m,lookbehind:!0,alias:"important",inside:{punctuation:/^#+|#+$/}}],hr:{pattern:/(^\s*)([*-])([\t ]*\2){2,}(?=\s*$)/m,lookbehind:!0,alias:"punctuation"},list:{pattern:/(^\s*)(?:[*+-]|\d+\.)(?=[\t ].)/m,lookbehind:!0,alias:"punctuation"},"url-reference":{pattern:/!?\[[^\]]+\]:[\t ]+(?:\S+|<(?:\\.|[^>\\])+>)(?:[\t ]+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^)\\])*\)))?/,inside:{variable:{pattern:/^(!?\[)[^\]]+/,lookbehind:!0},string:/(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^)\\])*\))$/,punctuation:/^[\[\]!:]|[<>]/},alias:"url"},bold:{pattern:/(^|[^\\])(\*\*|__)(?:(?:\r?\n|\r)(?!\r?\n|\r)|.)+?\2/,lookbehind:!0,inside:{punctuation:/^\*\*|^__|\*\*$|__$/}},italic:{pattern:/(^|[^\\])([*_])(?:(?:\r?\n|\r)(?!\r?\n|\r)|.)+?\2/,lookbehind:!0,inside:{punctuation:/^[*_]|[*_]$/}},url:{pattern:/!?\[[^\]]+\](?:\([^\s)]+(?:[\t ]+"(?:\\.|[^"\\])*")?\)| ?\[[^\]\n]*\])/,inside:{variable:{pattern:/(!?\[)[^\]]+(?=\]$)/,lookbehind:!0},string:{pattern:/"(?:\\.|[^"\\])*"(?=\)$)/}}}}),Prism.languages.markdown.bold.inside.url=Prism.util.clone(Prism.languages.markdown.url),Prism.languages.markdown.italic.inside.url=Prism.util.clone(Prism.languages.markdown.url),Prism.languages.markdown.bold.inside.italic=Prism.util.clone(Prism.languages.markdown.italic),Prism.languages.markdown.italic.inside.bold=Prism.util.clone(Prism.languages.markdown.bold); // prettier-ignore
@@ -55,6 +56,22 @@ const MarkdownPreviewExample = () => {
     return ranges;
   }, []);
 
+  function updateLines() {
+    debug("updateLines");
+    const [match] = Editor.nodes(editor, {
+      match: (n) => {
+        debug(n, n.type);
+        return true;
+      },
+    });
+    // Toggle the block type depending on whether there's already a match.
+    Transforms.setNodes(
+      editor,
+      { type: match ? "paragraph" : "code" },
+      { match: (n) => Editor.isBlock(editor, n) }
+    );
+  }
+
   return (
     <>
       <Navbar>
@@ -67,6 +84,8 @@ const MarkdownPreviewExample = () => {
           onChange={(value) => setValue(value)}
         >
           <Editable
+            onPointerDown={updateLines}
+            onKeyDown={updateLines}
             decorate={decorate}
             renderLeaf={renderLeaf}
             placeholder="Write some markdown..."
@@ -80,6 +99,7 @@ const MarkdownPreviewExample = () => {
 };
 
 const Leaf = ({ attributes, children, leaf }) => {
+  debug({ attributes, children, leaf });
   return (
     <span
       {...attributes}
