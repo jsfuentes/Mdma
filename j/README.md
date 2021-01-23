@@ -1,5 +1,7 @@
 # React-Base
 
+This is an example of using slate to do markdown in text
+
 create-react-app with tailwindcss and more:
 
 - basic React Router routing with code splitting and loading with React Suspense
